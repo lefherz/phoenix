@@ -1,14 +1,33 @@
 const groupSharePostfix = '\nGroup'
 const userSharePostfix = '\nUser'
+const util = require('util')
+const collaboratorPermissionArray = ['share', 'change', 'create', 'delete']
 
 module.exports = {
   commands: {
     /**
      *
+     * @param {string} permissions
+     */
+    permissionArray: function (permissions) {
+      permissions = permissions.replace(/\s/g, '')
+      return permissions.split(',')
+    },
+    /**
+     *
+     * @param {string} permission
+     */
+    permissionXpathConverter: function (permission) {
+      return util.format(this.elements.permissionButton.selector, permission)
+    },
+    /**
+     *
      * @param {string} sharee
      * @param {boolean} shareWithGroup
+     * @param {string} role
+     * @param {string} permissions
      */
-    shareWithUserOrGroup: async function (sharee, shareWithGroup = false, role) {
+    shareWithUserOrGroup: async function (sharee, shareWithGroup = false, role, permissions) {
       this.enterAutoComplete(sharee)
       // We need waitForElementPresent here.
       // waitForElementVisible would break even with 'abortOnFailure: false' if the element is not present
@@ -41,10 +60,18 @@ module.exports = {
           }
         })
       })
+      this.selectRoleForNewCollaborator(role)
+      if (permissions === undefined) {
+        return this.confirmShare()
+      }
 
-      return this
-        .selectRoleForNewCollaborator(role)
-        .confirmShare()
+      const permissionArray = this.permissionArray(permissions)
+      for (let permission of permissionArray) {
+        permission = this.permissionXpathConverter(permission)
+        await this.useXpath().click(permission)
+      }
+
+      return this.confirmShare()
     },
     /**
      *
@@ -76,6 +103,91 @@ module.exports = {
         // do nothing
       }
       return this.api.page.FilesPageElement.filesList()
+    },
+    /**
+     *
+     * @param {String} collaborator
+     * @param {String} requiredPermissions
+     */
+    changeCustomPermissionsTo: async function (collaborator, requiredPermissions) {
+      const requiredPermissionArray = this.permissionArray(requiredPermissions)
+      const informationSelector = util.format(this.elements.collaboratorInformationByCollaboratorName.selector, collaborator)
+      const selectRoleButton = informationSelector + this.elements.selectRoleButtonInCollaboratorInformation.selector
+
+      let permission = ''
+      this
+        .useXpath()
+        .waitForElementVisible(informationSelector)
+        .click(informationSelector)
+        .waitForElementVisible(selectRoleButton)
+
+      for (let i = 0; i < collaboratorPermissionArray.length; i++) {
+        permission = collaboratorPermissionArray[i]
+        const permissionXpath = this.permissionXpathConverter(permission)
+        await this.api.waitForElementVisible({ selector: permissionXpath, timeout: 100, abortOnFailure: false }, function (result) {
+          if (result.value === true) {
+            this
+              .getAttribute(permissionXpath, 'data-state', (state) => {
+                if ((state.value === 'on' && !requiredPermissionArray.includes(permission)) ||
+                  (state.value === 'off' && requiredPermissionArray.includes(permission))) {
+                  // need to click
+                  this.useXpath()
+                    .waitForElementVisible(permissionXpath)
+                    .click(permissionXpath)
+                }
+              })
+          }
+        })
+      }
+
+      return this.waitForElementVisible('@saveShareButton')
+        .click('@saveShareButton')
+        .waitForOutstandingAjaxCalls()
+        .waitForElementNotPresent('@saveShareButton')
+    },
+    /**
+     *
+     * @param {String} collaborator
+     * @param {String} permissions
+     */
+    assertPermissionIsDisplayed: async function (collaborator, permissions = undefined) {
+      const informationSelector = util.format(this.elements.collaboratorInformationByCollaboratorName.selector, collaborator)
+      const selectRoleButton = informationSelector + this.elements.selectRoleButtonInCollaboratorInformation.selector
+
+      let permissionArray
+      if (permissions !== undefined) {
+        permissionArray = this.permissionArray(permissions)
+      } else {
+        permissionArray = collaboratorPermissionArray
+      }
+
+      this
+        .useXpath()
+        .waitForElementVisible(informationSelector)
+        .click(informationSelector)
+        .waitForElementVisible(selectRoleButton)
+
+      for (let i = 0; i < permissionArray.length; i++) {
+        const permissionXpath = this.permissionXpathConverter(permissionArray[i])
+        if (permissions !== undefined) {
+          await this
+            .assert
+            .attributeEquals(
+              permissionXpath, 'data-state', 'on', `data-state of xpath ${permissionXpath} is not set `)
+        } else {
+          return this.api.isVisible(permissionXpath, result => {
+            if (result.value === true) {
+              this
+                .assert
+                .attributeEquals(permissionXpath, 'data-state', 'off', `data-state of xpath ${permissionXpath} is set `)
+            } else {
+              this
+                .assert
+                .attributeEquals(permissionXpath, 'data-state', 'null', `data-state of xpath ${permissionXpath} found `)
+            }
+          })
+        }
+      }
     },
     /**
      *
@@ -123,7 +235,6 @@ module.exports = {
      * @returns {Promise.<string[]>} Array of autocomplete webElementIds
      */
     deleteShareWithUserGroup: function (item) {
-      const util = require('util')
       const informationSelector = util.format(this.elements.collaboratorInformationByCollaboratorName.selector, item)
       const moreInformationSelector = informationSelector + this.elements.collaboratorMoreInformation.selector
       const deleteSelector = informationSelector + this.elements.deleteShareButton.selector
@@ -279,6 +390,10 @@ module.exports = {
     roleButtonInDropdown: {
       // the translate bit is to make it case-insensitive
       selector: '//span[translate(.,"ABCDEFGHJIKLMNOPQRSTUVWXYZ","abcdefghjiklmnopqrstuvwxyz") ="%s"]',
+      locateStrategy: 'xpath'
+    },
+    permissionButton: {
+      selector: '//span[.="Can %s"]/parent::div/div',
       locateStrategy: 'xpath'
     }
   }

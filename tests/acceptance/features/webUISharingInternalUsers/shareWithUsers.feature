@@ -309,3 +309,98 @@ Feature: Sharing files and folders with internal users
 #    And file "lorem.txt" should be listed in shared-with-others page on the webUI
     And as "user2" file "lorem (2).txt" should not exist
     But as "user3" file "lorem (2).txt" should exist
+
+  @issue-1853 @issue-1837
+  Scenario Outline: Change permissions of the previously shared folder
+    Given user "user2" has shared folder "simple-folder" with user "user1" with "<initial-permissions>" permissions
+    And user "user2" has logged in using the webUI
+    Then no custom permissions should be set for collaborator "User One" for folder "simple-folder" on the webUI
+    When the user changes permission of collaborator "User One" for folder "simple-folder" to "<collaborators-permissions>" using the webUI
+    Then custom permission "<displayed-permissions>" should be set for user "User One" for folder "simple-folder" on the webUI
+    And user "user1" should have received a share with these details:
+      | field       | value                  |
+      | uid_owner   | user2                  |
+      | share_with  | user1                  |
+      | file_target | /simple-folder (2)     |
+      | item_type   | folder                 |
+      | permissions | <expected-permissions> |
+    Examples:
+      | initial-permissions         | collaborators-permissions | displayed-permissions | expected-permissions |
+      | read                        | share                     | share                 | read, share          |
+
+  @issue-1853 @issue-1837
+  Scenario Outline: Change permissions of the previously shared folder
+    Given user "user2" has shared folder "simple-folder" with user "user1" with "<initial-permissions>" permissions
+    And user "user2" has logged in using the webUI
+    Then no custom permissions should be set for collaborator "User One" for folder "simple-folder" on the webUI
+#    Then custom permissions "<initial-displayed-permissions>" should be set for user "User One" for folder "simple-folder" on the webUI
+    When the user changes permission of collaborator "User One" for folder "simple-folder" to "<collaborators-permissions>" using the webUI
+    Then no custom permissions should be set for collaborator "User One" for folder "simple-folder" on the webUI
+#    Then custom permission "<displayed-permissions>" should be set for user "User One" for folder "simple-folder" on the webUI
+    And user "user1" should have received a share with these details:
+      | field       | value                  |
+      | uid_owner   | user2                  |
+      | share_with  | user1                  |
+      | file_target | /simple-folder (2)     |
+      | item_type   | folder                 |
+      | permissions | <expected-permissions> |
+    Examples:
+      | initial-permissions         | initial-displayed-permissions | collaborators-permissions | displayed-permissions | expected-permissions        |
+      | read, share, create, delete | share, create, delete         |create, delete, share     | share, create, delete | read, share, create, delete |
+
+  @issue-1853 @issue-1837
+  Scenario Outline: Change permissions of the previously shared folder
+    Given user "user2" has shared folder "simple-folder" with user "user1" with "<initial-permissions>" permissions
+    And user "user2" has logged in using the webUI
+    Then custom permissions "<initial-displayed-permissions>" should be set for user "User One" for folder "simple-folder" on the webUI
+    When the user changes permission of collaborator "User One" for folder "simple-folder" to "<collaborators-permissions>" using the webUI
+    Then no custom permissions should be set for collaborator "User One" for folder "simple-folder" on the webUI
+#    Then custom permission "<displayed-permissions>" should be set for user "User One" for folder "simple-folder" on the webUI
+    And user "user1" should have received a share with these details:
+      | field       | value                  |
+      | uid_owner   | user2                  |
+      | share_with  | user1                  |
+      | file_target | /simple-folder (2)     |
+      | item_type   | folder                 |
+      | permissions | <expected-permissions> |
+    Examples:
+      | initial-permissions | initial-displayed-permissions | collaborators-permissions | displayed-permissions | expected-permissions |
+      | read, share, create | share, create                 | delete, change            | delete, change        | read, change, delete |
+
+  @issue-1853 @issue-1837
+  Scenario Outline: Change permissions of the previously shared folder
+    Given user "user2" has shared folder "simple-folder" with user "user1" with "<initial-permissions>" permissions
+    And user "user2" has logged in using the webUI
+    Then custom permissions "<initial-displayed-permissions>" should be set for user "User One" for folder "simple-folder" on the webUI
+    When the user changes permission of collaborator "User One" for folder "simple-folder" to "<collaborators-permissions>" using the webUI
+    Then custom permission "<displayed-permissions>" should be set for user "User One" for folder "simple-folder" on the webUI
+    And user "user1" should have received a share with these details:
+      | field       | value                  |
+      | uid_owner   | user2                  |
+      | share_with  | user1                  |
+      | file_target | /simple-folder (2)     |
+      | item_type   | folder                 |
+      | permissions | <expected-permissions> |
+    Examples:
+      | initial-permissions | initial-displayed-permissions | collaborators-permissions | displayed-permissions | expected-permissions |
+      | read, delete        | delete                        | create, share             | create, share         | read, create, share  |
+
+  Scenario Outline: share a folder with another internal user assigning a role and the permissions
+    Given user "user2" has logged in using the webUI
+    When the user shares folder "simple-folder" with user "User One" as "<role>" with permissions "<collaborators-permissions>" using the webUI
+    Then user "User One" should be listed as "<displayed-role>" in the collaborators list for folder "simple-folder" on the webUI
+    And custom permissions "<displayed-permissions>" should be set for user "User One" for folder "simple-folder" on the webUI
+    And user "user1" should have received a share with these details:
+      | field       | value              |
+      | uid_owner   | user2              |
+      | share_with  | user1              |
+      | file_target | /simple-folder (2) |
+      | item_type   | folder             |
+      | permissions | <permissions>      |
+    Examples:
+      | role        | displayed-role | collaborators-permissions     | displayed-permissions | permissions                         |
+      | Viewer      | Viewer         | share                         | share                 | read, share                         |
+      | Editor      | Editor         | share                         | share                 | all                                 |
+      | Custom Role | Custom role    | share, create                 | share, create         | read, share, create                 |
+      | Custom Role | Editor         | change, share                 | share                 | read, change, share                 |
+      | Custom Role | Editor         | delete, share, create, change | share                 | read, share, delete, change, create |
